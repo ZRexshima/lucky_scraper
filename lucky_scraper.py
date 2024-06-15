@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 
-from datetime import date
+import json
+from pathlib import Path
 import re
 
 
@@ -11,42 +12,49 @@ def main():
 
     soup = BeautifulSoup(source, 'xml')
 
-    # get a single item
-    item_text = soup.find('item').get_text()
+    exchange_rates: Path = Path.cwd() / 'exchange_rates.json'
 
-    items = []
-    item = {}
-    if new_data := get_item(item_text):
-        item = new_data
-        items.append(item)
-    print(item)
-    print(items)
+    rates: list[dict] = []
+    if saved_data := get_saved_json(exchange_rates):
+        rates.extend(saved_data)
+
+    # get dict of all items into a list and extend the rates list
+    rates.extend([get_item(i.text) for i in soup.find_all('item')])
+
+    # save all rates data to file
+    write_json(rates, exchange_rates)
 
 
 def get_item(item_text: str) -> dict[str: any]:
-    # Scrape and convert date to datetime.date object
+    # Scrape date to text since datetime objects will not serialize to JSON
     exchange = {}
-    d = re.compile(r'(\w{3})\.(\d{1,2})\.{2}(\d{4})\b')
+    d = re.compile(r'(\d{4})年(\d{1,2})月(\d{1,2})')
     if matches := d.search(item_text):
-        m, day, year = (matches.group(1), int(matches.group(2)),
-                        int(matches.group(3)))
-        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        if m in months:
-            month = months.index(m) + 1
-        else:
-            raise ValueError('Invalid month value')
+        year, month, day = (int(matches.group(1)),
+                            int(matches.group(2)),
+                            int(matches.group(3)))
 
-        item_date = date(year, month, day)
+        item_date = f'{year}-{month:02}-{day:02}'
         exchange['date'] = item_date
 
     rate = re.compile(r'(\(Our Change.*\))[<>/\w]+(\D{3}＝)(\d{3}\.\d{2})[<>/\w]+')
     if matches := rate.search(item_text):
-        message = f'{matches.group(1)} {matches.group(2)} {matches.group(3)}'
+        # message = f'{matches.group(1)} {matches.group(2)} {matches.group(3)}'
         exchange_rate = float(matches.group(3))
         exchange['exchange rate'] = exchange_rate
 
     return exchange
+
+
+def get_saved_json(file: Path) -> list[dict] | None:
+    if file.exists():
+        data: str = file.read_text()
+        return json.loads(data)
+
+
+def write_json(data: list[dict], file: Path) -> None:
+    json_payload = json.dumps(data, indent=4)
+    file.write_text(json_payload)
 
 
 if __name__ == '__main__':
