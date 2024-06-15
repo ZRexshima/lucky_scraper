@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
-from json_reader import get_saved_json
+from lucky_scraper import get_saved_json
+from lucky_scraper import write_json
+from lucky_scraper import get_item
 
 
 def test_get_saved_json():
@@ -18,8 +20,15 @@ def test_write_json():
     """Tests saving json to file"""
     data: list[dict] = [{'date': '2024-06-15', 'rate': 153.3}]
     test_file: Path = Path.cwd() / 'test.json'
-    json_payload = json.dumps(data, indent=4)
-    test_file.write_text(json_payload)
+    # json_payload = json.dumps(data, indent=4)
+    # test_file.write_text(json_payload)
+    write_json(data, test_file)
 
     file_data = test_file.read_text()
-    assert file_data == json_payload
+    raw_data = json.loads(file_data)
+    assert raw_data == data
+
+
+def test_get_item():
+    ...
+
